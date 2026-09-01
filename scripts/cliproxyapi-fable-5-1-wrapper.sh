@@ -4,7 +4,11 @@ set -eu
 
 if [ -z "${HOME:-}" ]; then
   user_name="$(/usr/bin/id -un)"
-  HOME="$(/usr/bin/dscl . -read "/Users/${user_name}" NFSHomeDirectory | /usr/bin/awk '{print $2}')"
+  HOME="/Users/${user_name}"
+  if [ ! -d "${HOME}" ]; then
+    echo "Unable to resolve the macOS home directory for ${user_name}." >&2
+    exit 1
+  fi
   export HOME
 fi
 
