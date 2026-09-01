@@ -17,6 +17,7 @@ if ! command -v brew >/dev/null 2>&1; then
   exit 1
 fi
 
+brew_prefix="$(brew --prefix)"
 formula_prefix="$(brew --prefix cliproxyapi 2>/dev/null || true)"
 if [[ -z "${formula_prefix}" ]]; then
   echo "Install CLIProxyAPI ${upstream_version} with Homebrew first." >&2
@@ -87,7 +88,7 @@ trap cleanup EXIT
   GOTOOLCHAIN="${go_toolchain}" go test ./internal/registry
   GOTOOLCHAIN="${go_toolchain}" go build \
     -trimpath \
-    -ldflags "-s -w -X main.Version=${patch_version} -X main.Commit=${base_commit}+fable5.1 -X main.BuildDate=2026-09-01 -X main.DefaultConfigPath=${formula_prefix}/etc/cliproxyapi.conf" \
+    -ldflags "-s -w -X main.Version=${patch_version} -X main.Commit=${base_commit}+fable5.1 -X main.BuildDate=2026-09-01 -X main.DefaultConfigPath=${brew_prefix}/etc/cliproxyapi.conf" \
     -o "${build_dir}/cliproxyapi" \
     ./cmd/server
 )
