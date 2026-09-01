@@ -5,6 +5,7 @@ set -euo pipefail
 patch_version="7.2.145-fable5.1"
 upstream_version="7.2.145"
 base_commit="d9cea8904b14fbbebb77ef26e98ef08f6b48a724"
+go_toolchain="go1.26.0"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "This installer supports macOS only." >&2
@@ -25,6 +26,7 @@ fi
 target_binary="${formula_prefix}/bin/cliproxyapi"
 state_root="${XDG_STATE_HOME:-${HOME}/.local/state}/cliproxyapi-fable-5-1"
 backup_binary="${state_root}/cliproxyapi-${upstream_version}.upstream"
+patched_binary="${state_root}/cliproxyapi-${patch_version}"
 
 if [[ ! -x "${target_binary}" ]]; then
   echo "CLIProxyAPI binary not found at ${target_binary}." >&2
@@ -65,6 +67,7 @@ fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
+wrapper_script="${script_dir}/cliproxyapi-fable-5-1-wrapper.sh"
 
 if git -C "${repo_root}" rev-parse --git-dir >/dev/null 2>&1; then
   if ! git -C "${repo_root}" merge-base --is-ancestor "${base_commit}" HEAD; then
@@ -81,10 +84,10 @@ trap cleanup EXIT
 
 (
   cd "${repo_root}"
-  go test ./internal/registry
-  go build \
+  GOTOOLCHAIN="${go_toolchain}" go test ./internal/registry
+  GOTOOLCHAIN="${go_toolchain}" go build \
     -trimpath \
-    -ldflags "-s -w -X main.Version=${patch_version} -X main.Commit=${base_commit}+fable5.1 -X main.BuildDate=2026-09-01" \
+    -ldflags "-s -w -X main.Version=${patch_version} -X main.Commit=${base_commit}+fable5.1 -X main.BuildDate=2026-09-01 -X main.DefaultConfigPath=${formula_prefix}/etc/cliproxyapi.conf" \
     -o "${build_dir}/cliproxyapi" \
     ./cmd/server
 )
@@ -99,9 +102,10 @@ mkdir -p "${state_root}"
 if [[ "${current_version}" != *"${patch_version}"* && ! -f "${backup_binary}" ]]; then
   cp -p "${target_binary}" "${backup_binary}"
 fi
+install -m 0755 "${build_dir}/cliproxyapi" "${patched_binary}"
 
 brew services stop cliproxyapi >/dev/null
-if ! install -m 0755 "${build_dir}/cliproxyapi" "${target_binary}"; then
+if ! install -m 0755 "${wrapper_script}" "${target_binary}"; then
   brew services start cliproxyapi >/dev/null || true
   exit 1
 fi

@@ -18,12 +18,16 @@ cd CLIProxyAPI
 The installer:
 
 - requires the Homebrew CLIProxyAPI 7.2.145 formula;
-- installs Go through Homebrew if it is missing;
+- installs Go through Homebrew if it is missing, then uses the project-pinned
+  Go 1.26.0 toolchain;
 - runs the focused registry tests;
 - builds a version-stamped `7.2.145-fable5.1` binary;
 - backs up the upstream Homebrew binary under
   `~/.local/state/cliproxyapi-fable-5-1/`;
-- replaces only the formula binary and restarts the existing Homebrew service.
+- stores the patched binary beside the backup;
+- installs a small formula-bin wrapper that restores `HOME` for launchd before
+  executing the patched binary;
+- restarts the existing Homebrew service.
 
 Existing configuration and OAuth files are not modified.
 
@@ -35,4 +39,3 @@ Existing configuration and OAuth files are not modified.
 
 Homebrew may replace the patched binary during an upgrade or reinstall. Re-run
 the installer only while this hotfix is still needed.
-
