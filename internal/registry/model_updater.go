@@ -24,6 +24,10 @@ var modelsURLs = []string{
 	"https://models.router-for.me/models.json",
 }
 
+var embeddedClaudeOverlayModelIDs = map[string]struct{}{
+	"claude-fable-5-1": {},
+}
+
 //go:embed models/models.json
 var embeddedModelsJSON []byte
 
@@ -183,10 +187,53 @@ func fetchModelsFromRemote(ctx context.Context) (*staticModelsJSON, string) {
 			log.Warnf("models validate failed from %s: %v", url, err)
 			continue
 		}
+		applyEmbeddedModelOverlays(&parsed)
 
 		return &parsed, url
 	}
 	return nil, ""
+}
+
+// applyEmbeddedModelOverlays preserves selected local model definitions while
+// allowing every other provider model to continue following the remote catalog.
+func applyEmbeddedModelOverlays(data *staticModelsJSON) {
+	if data == nil {
+		return
+	}
+
+	var embedded staticModelsJSON
+	if err := json.Unmarshal(embeddedModelsJSON, &embedded); err != nil {
+		log.Warnf("models overlay: failed to parse embedded catalog: %v", err)
+		return
+	}
+	data.Claude = mergeSelectedModelOverlays(data.Claude, embedded.Claude, embeddedClaudeOverlayModelIDs)
+}
+
+func mergeSelectedModelOverlays(current, embedded []*ModelInfo, selected map[string]struct{}) []*ModelInfo {
+	out := append([]*ModelInfo(nil), current...)
+	seen := make(map[string]struct{}, len(current))
+	for _, model := range current {
+		if model == nil {
+			continue
+		}
+		seen[strings.ToLower(strings.TrimSpace(model.ID))] = struct{}{}
+	}
+
+	for _, model := range embedded {
+		if model == nil {
+			continue
+		}
+		id := strings.ToLower(strings.TrimSpace(model.ID))
+		if _, ok := selected[id]; !ok {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, model)
+	}
+	return out
 }
 
 // detectChangedProviders compares two model catalogs and returns provider names
